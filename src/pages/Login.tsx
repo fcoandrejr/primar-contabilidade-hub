@@ -1,74 +1,106 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Building2, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, Lock, Mail, Eye, EyeOff, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [activeTab, setActiveTab] = useState("login");
+  const [loginData, setLoginData] = useState({
     email: "",
     password: "",
   });
+  const [signupData, setSignupData] = useState({
+    nome: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate("/dashboard");
+    }
+  }, [user, authLoading, navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simulação de login - remover quando conectar ao Supabase
-    setTimeout(() => {
-      setLoading(false);
-      
-      // Simulação de diferentes tipos de usuário baseado no email
-      if (formData.email.includes("admin")) {
-        localStorage.setItem("userType", "admin");
-        localStorage.setItem("userName", "João Silva");
-      } else if (formData.email.includes("funcionario")) {
-        localStorage.setItem("userType", "funcionario");
-        localStorage.setItem("userName", "Maria Santos");
-      } else {
-        localStorage.setItem("userType", "cliente");
-        localStorage.setItem("userName", "Carlos Oliveira");
-      }
+    const { error } = await signIn(loginData.email, loginData.password);
 
+    if (error) {
+      toast({
+        title: "Erro no login",
+        description: error.message === "Invalid login credentials" 
+          ? "Email ou senha incorretos" 
+          : "Erro ao fazer login. Tente novamente.",
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Login realizado com sucesso!",
         description: "Bem-vindo ao Sistema Primar.",
       });
-
       navigate("/dashboard");
-    }, 1500);
+    }
+
+    setLoading(false);
   };
 
-  const handleDemoLogin = (userType: 'admin' | 'funcionario' | 'cliente') => {
-    setLoading(true);
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    setTimeout(() => {
-      setLoading(false);
-      localStorage.setItem("userType", userType);
-      
-      const demoUsers = {
-        admin: "João Silva (Admin)",
-        funcionario: "Maria Santos (Funcionário)",
-        cliente: "Carlos Oliveira (Cliente)"
-      };
-      
-      localStorage.setItem("userName", demoUsers[userType]);
-      
+    if (signupData.password !== signupData.confirmPassword) {
       toast({
-        title: "Login demo realizado!",
-        description: `Conectado como ${demoUsers[userType]}`,
+        title: "Erro no cadastro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
       });
+      return;
+    }
 
-      navigate("/dashboard");
-    }, 1000);
+    if (signupData.password.length < 6) {
+      toast({
+        title: "Erro no cadastro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await signUp(signupData.email, signupData.password, signupData.nome);
+
+    if (error) {
+      toast({
+        title: "Erro no cadastro",
+        description: error.message === "User already registered" 
+          ? "Este email já está cadastrado" 
+          : "Erro ao criar conta. Tente novamente.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Faça login para acessar o sistema.",
+      });
+      setActiveTab("login");
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -85,105 +117,155 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Card de Login */}
+        {/* Card de Autenticação */}
         <Card className="glass-card animate-fade-in">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl text-center">Entrar no Sistema</CardTitle>
-            <CardDescription className="text-center">
-              Digite suas credenciais para acessar o sistema
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login" className="flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Login
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Cadastro
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login" className="space-y-4">
+              <div className="space-y-2 text-center">
+                <h3 className="text-2xl font-bold">Entrar no Sistema</h3>
+                <p className="text-muted-foreground">Digite suas credenciais para acessar</p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="pl-10"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10 pr-10"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full gradient-primary" 
+                  disabled={loading || authLoading}
+                >
+                  {loading ? "Entrando..." : "Entrar"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup" className="space-y-4">
+              <div className="space-y-2 text-center">
+                <h3 className="text-2xl font-bold">Criar Conta</h3>
+                <p className="text-muted-foreground">Preencha os dados para criar sua conta</p>
+              </div>
+
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-nome">Nome Completo</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    className="pl-10"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    id="signup-nome"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={signupData.nome}
+                    onChange={(e) => setSignupData({ ...signupData, nome: e.target.value })}
                     required
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="pl-10 pr-10"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="pl-10"
+                      value={signupData.email}
+                      onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <Button 
-                type="submit" 
-                className="w-full gradient-primary" 
-                disabled={loading}
-              >
-                {loading ? "Entrando..." : "Entrar"}
-              </Button>
-            </form>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10"
+                      value={signupData.password}
+                      onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
 
-            {/* Login Demo */}
-            <div className="space-y-3">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Ou teste o sistema:</p>
-              </div>
-              
-              <div className="grid gap-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-between"
-                  onClick={() => handleDemoLogin('admin')}
-                  disabled={loading}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-confirm">Confirmar Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-confirm"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="pl-10"
+                      value={signupData.confirmPassword}
+                      onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full gradient-primary" 
+                  disabled={loading || authLoading}
                 >
-                  <span>Login como Administrador</span>
-                  <Badge variant="default">Admin</Badge>
+                  {loading ? "Criando conta..." : "Criar Conta"}
                 </Button>
-                
-                <Button
-                  variant="outline"
-                  className="w-full justify-between"
-                  onClick={() => handleDemoLogin('funcionario')}
-                  disabled={loading}
-                >
-                  <span>Login como Funcionário</span>
-                  <Badge variant="secondary">Staff</Badge>
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  className="w-full justify-between"
-                  onClick={() => handleDemoLogin('cliente')}
-                  disabled={loading}
-                >
-                  <span>Login como Cliente</span>
-                  <Badge variant="outline">Cliente</Badge>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
+              </form>
+            </TabsContent>
+          </Tabs>
         </Card>
 
         {/* Footer */}

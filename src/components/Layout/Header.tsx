@@ -9,16 +9,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 interface HeaderProps {
   onMenuClick: () => void;
-  userType: 'admin' | 'funcionario' | 'cliente';
-  userName: string;
   companyName?: string;
 }
 
-export function Header({ onMenuClick, userType, userName, companyName }: HeaderProps) {
+export function Header({ onMenuClick, companyName }: HeaderProps) {
   const [notifications] = useState(3);
+  const { profile, userRole, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const userName = profile?.nome || "Usuário";
+  const userType = userRole || "cliente";
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   const getUserTypeLabel = () => {
     switch (userType) {
@@ -115,7 +125,7 @@ export function Header({ onMenuClick, userType, userName, companyName }: HeaderP
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </DropdownMenuItem>

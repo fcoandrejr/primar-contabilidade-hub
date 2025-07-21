@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { useAuth } from "@/hooks/useAuth";
 
 const documentosData = [
   { name: "Pessoal", value: 45, color: "hsl(var(--dept-pessoal))" },
@@ -45,8 +46,10 @@ const receitaMes = [
 ];
 
 export default function Dashboard() {
-  const userType = localStorage.getItem("userType") as 'admin' | 'funcionario' | 'cliente' || 'admin';
-  const userName = localStorage.getItem("userName") || 'Usuário';
+  const { profile, userRole } = useAuth();
+  
+  const userType = userRole || 'cliente';
+  const userName = profile?.nome || 'Usuário';
 
   const renderAdminStats = () => (
     <>
@@ -109,7 +112,7 @@ export default function Dashboard() {
   );
 
   return (
-    <Layout userType={userType} userName={userName}>
+    <Layout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="space-y-2">

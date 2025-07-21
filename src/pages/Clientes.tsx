@@ -40,6 +40,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Cliente {
   id: string;
@@ -94,9 +95,10 @@ const clientesData: Cliente[] = [
 ];
 
 export default function Clientes() {
-  const userType = localStorage.getItem("userType") as 'admin' | 'funcionario' | 'cliente' || 'admin';
-  const userName = localStorage.getItem("userName") || 'Usuário';
+  const { userRole } = useAuth();
   const { toast } = useToast();
+  
+  const userType = userRole || 'cliente';
 
   const [clientes, setClientes] = useState<Cliente[]>(clientesData);
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,7 +204,7 @@ export default function Clientes() {
   const receitaTotal = clientes.filter(c => c.status === 'ativo').reduce((acc, c) => acc + c.valorMensal, 0);
 
   return (
-    <Layout userType={userType} userName={userName}>
+    <Layout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex justify-between items-start">
