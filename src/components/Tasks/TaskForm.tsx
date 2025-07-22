@@ -88,11 +88,13 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
 
   const fetchClients = async () => {
     try {
+      console.log('Fetching clients...');
       const { data, error } = await supabase
         .from('profiles')
         .select('id, nome, email, user_id')
         .eq('ativo', true);
 
+      console.log('All profiles:', data);
       if (error) throw error;
 
       // Filter only clients based on user_roles
@@ -101,6 +103,7 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
         .select('user_id')
         .eq('role', 'cliente');
 
+      console.log('Client roles:', clientRoles);
       if (rolesError) throw rolesError;
 
       const clientUserIds = clientRoles.map(role => role.user_id);
@@ -108,6 +111,7 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
         clientUserIds.includes(profile.user_id)
       );
 
+      console.log('Filtered client profiles:', clientProfiles);
       setClients(clientProfiles);
     } catch (error) {
       console.error('Error fetching clients:', error);
