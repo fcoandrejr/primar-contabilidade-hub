@@ -261,13 +261,13 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
             <Label>Cliente</Label>
             <Select
               value={formData.client_id}
-              onValueChange={(value) => setFormData({ ...formData, client_id: value })}
+              onValueChange={(value) => setFormData({ ...formData, client_id: value === 'none' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar cliente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum cliente</SelectItem>
+                <SelectItem value="none">Nenhum cliente</SelectItem>
                 {clients.map(client => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.nome} ({client.email})
@@ -281,13 +281,13 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
             <Label>Responsável</Label>
             <Select
               value={formData.assigned_to}
-              onValueChange={(value) => setFormData({ ...formData, assigned_to: value })}
+              onValueChange={(value) => setFormData({ ...formData, assigned_to: value === 'none' ? undefined : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar responsável" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum responsável</SelectItem>
+                <SelectItem value="none">Nenhum responsável</SelectItem>
                 {funcionarios.map(func => (
                   <SelectItem key={func.user_id} value={func.user_id}>
                     {func.nome} ({func.email})
