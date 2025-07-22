@@ -45,12 +45,7 @@ export function useTasks() {
     try {
       const { data, error } = await supabase
         .from('tasks')
-        .select(`
-          *,
-          profiles:created_by(nome, email),
-          assigned_user:assigned_to(nome, email),
-          client:client_id(nome, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
