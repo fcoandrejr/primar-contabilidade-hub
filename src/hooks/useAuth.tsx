@@ -203,6 +203,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error };
       }
 
+      // A trigger criará automaticamente o perfil e role
+      console.log('Sign up successful:', data);
       return { error: null };
     } catch (error) {
       console.error('Sign up error:', error);
