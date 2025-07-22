@@ -8,6 +8,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
+import Financeiro from "./pages/Financeiro";
+import Funcionarios from "./pages/Funcionarios";
+import Tarefas from "./pages/Tarefas";
+import Documentos from "./pages/Documentos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,15 +28,15 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-            <Route path="/documentos" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/tarefas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
+            <Route path="/tarefas" element={<ProtectedRoute><Tarefas /></ProtectedRoute>} />
             <Route path="/agenda" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/meus-documentos" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/solicitacoes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/financeiro" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
             <Route path="/microsaas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/funcionarios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
