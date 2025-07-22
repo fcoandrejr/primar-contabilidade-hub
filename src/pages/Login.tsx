@@ -36,27 +36,50 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    const { error } = await signIn(loginData.email, loginData.password);
-
-    if (error) {
+    console.log("Login button clicked", { email: loginData.email });
+    
+    if (!loginData.email || !loginData.password) {
       toast({
         title: "Erro no login",
-        description: error.message === "Invalid login credentials" 
-          ? "Email ou senha incorretos" 
-          : "Erro ao fazer login. Tente novamente.",
+        description: "Preencha email e senha",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Bem-vindo ao Sistema Primar.",
-      });
-      navigate("/dashboard");
+      return;
     }
 
-    setLoading(false);
+    setLoading(true);
+
+    try {
+      const { error } = await signIn(loginData.email, loginData.password);
+      console.log("Sign in result:", { error });
+
+      if (error) {
+        console.error("Login error:", error);
+        toast({
+          title: "Erro no login",
+          description: error.message === "Invalid login credentials" 
+            ? "Email ou senha incorretos" 
+            : `Erro ao fazer login: ${error.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Login successful");
+        toast({
+          title: "Login realizado com sucesso!",
+          description: "Bem-vindo ao Sistema Primar.",
+        });
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      console.error("Login exception:", err);
+      toast({
+        title: "Erro no login",
+        description: "Erro inesperado. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
