@@ -50,6 +50,161 @@ export type Database = {
         }
         Relationships: []
       }
+      task_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          blocked_reason: string | null
+          can_admin_override: boolean
+          client_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_blocked: boolean
+          is_recurring: boolean
+          next_occurrence: string | null
+          parent_task_id: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_interval: number | null
+          recurrence_type: Database["public"]["Enums"]["recurrence_type"] | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          blocked_reason?: string | null
+          can_admin_override?: boolean
+          client_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_blocked?: boolean
+          is_recurring?: boolean
+          next_occurrence?: string | null
+          parent_task_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_interval?: number | null
+          recurrence_type?:
+            | Database["public"]["Enums"]["recurrence_type"]
+            | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          blocked_reason?: string | null
+          can_admin_override?: boolean
+          client_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_blocked?: boolean
+          is_recurring?: boolean
+          next_occurrence?: string | null
+          parent_task_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_interval?: number | null
+          recurrence_type?:
+            | Database["public"]["Enums"]["recurrence_type"]
+            | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -76,6 +231,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_task: {
+        Args: { _user_id: string; _task_id: string }
+        Returns: boolean
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -90,6 +249,9 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "funcionario" | "cliente"
+      recurrence_type: "daily" | "weekly" | "monthly" | "yearly"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_status: "todo" | "in_progress" | "completed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -218,6 +380,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "funcionario", "cliente"],
+      recurrence_type: ["daily", "weekly", "monthly", "yearly"],
+      task_priority: ["low", "medium", "high", "urgent"],
+      task_status: ["todo", "in_progress", "completed", "cancelled"],
     },
   },
 } as const
