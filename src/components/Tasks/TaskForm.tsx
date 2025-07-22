@@ -162,8 +162,6 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
   };
 
   const canBlockTasks = isAdmin || isFuncionario;
-
-  console.log('TaskForm render - open:', open, 'task:', task);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,7 +258,7 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
           <div>
             <Label>Cliente</Label>
             <Select
-              value={formData.client_id}
+              value={formData.client_id || 'none'}
               onValueChange={(value) => setFormData({ ...formData, client_id: value === 'none' ? undefined : value })}
             >
               <SelectTrigger>
@@ -280,7 +278,7 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
           <div>
             <Label>Responsável</Label>
             <Select
-              value={formData.assigned_to}
+              value={formData.assigned_to || 'none'}
               onValueChange={(value) => setFormData({ ...formData, assigned_to: value === 'none' ? undefined : value })}
             >
               <SelectTrigger>

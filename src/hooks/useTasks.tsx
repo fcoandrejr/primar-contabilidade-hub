@@ -63,6 +63,15 @@ export function useTasks() {
   };
 
   const createTask = async (taskData: Partial<Task>) => {
+    if (!user?.id) {
+      toast({
+        title: "Erro",
+        description: "Usuário não autenticado",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const insertData = {
         title: taskData.title!,
@@ -70,15 +79,15 @@ export function useTasks() {
         status: taskData.status || 'todo',
         priority: taskData.priority || 'medium',
         due_date: taskData.due_date,
-        assigned_to: taskData.assigned_to,
-        client_id: taskData.client_id,
+        assigned_to: taskData.assigned_to || null,
+        client_id: taskData.client_id || null,
         is_recurring: taskData.is_recurring || false,
         recurrence_type: taskData.recurrence_type,
         recurrence_interval: taskData.recurrence_interval,
         is_blocked: taskData.is_blocked || false,
         blocked_reason: taskData.blocked_reason,
         can_admin_override: taskData.can_admin_override !== false,
-        created_by: user?.id!,
+        created_by: user.id,
       };
 
       const { data, error } = await supabase
