@@ -17,9 +17,15 @@ export type Database = {
       profiles: {
         Row: {
           ativo: boolean
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          complemento: string | null
           created_at: string
           email: string
           empresa: string | null
+          endereco: string | null
+          estado: string | null
           id: string
           nome: string
           telefone: string | null
@@ -28,9 +34,15 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
           created_at?: string
           email: string
           empresa?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           nome: string
           telefone?: string | null
@@ -39,9 +51,15 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
           created_at?: string
           email?: string
           empresa?: string | null
+          endereco?: string | null
+          estado?: string | null
           id?: string
           nome?: string
           telefone?: string | null

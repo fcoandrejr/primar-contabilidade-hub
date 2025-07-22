@@ -30,11 +30,13 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
-  Eye,
   Building2,
   Mail,
   Phone,
   User,
+  MapPin,
+  FileText,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,10 +48,22 @@ interface Cliente {
   email: string;
   telefone?: string;
   empresa?: string;
+  cnpj?: string;
+  endereco?: string;
+  cep?: string;
+  cidade?: string;
+  estado?: string;
+  complemento?: string;
   ativo: boolean;
   created_at: string;
   user_id: string;
 }
+
+const estadosBrasil = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
 
 export default function Clientes() {
   const { userRole, isAdmin, isFuncionario } = useAuth();
@@ -68,6 +82,12 @@ export default function Clientes() {
     email: "",
     telefone: "",
     empresa: "",
+    cnpj: "",
+    endereco: "",
+    cep: "",
+    cidade: "",
+    estado: "",
+    complemento: "",
     senha: "",
     confirmarSenha: "",
     ativo: true
@@ -81,6 +101,7 @@ export default function Clientes() {
 
   const fetchClientes = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -89,11 +110,16 @@ export default function Clientes() {
           email,
           telefone,
           empresa,
+          cnpj,
+          endereco,
+          cep,
+          cidade,
+          estado,
+          complemento,
           ativo,
           created_at,
           user_id
         `)
-        .eq('ativo', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -127,9 +153,13 @@ export default function Clientes() {
   };
 
   const filteredClientes = clientes.filter(cliente => {
-    const matchesSearch = cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cliente.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (cliente.empresa && cliente.empresa.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = (
+      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (cliente.empresa && cliente.empresa.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (cliente.cnpj && cliente.cnpj.includes(searchTerm)) ||
+      (cliente.cidade && cliente.cidade.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
     
     const matchesFilter = filterStatus === "todos" || 
                          (filterStatus === "ativo" && cliente.ativo) ||
@@ -138,22 +168,77 @@ export default function Clientes() {
     return matchesSearch && matchesFilter;
   });
 
+  const formatCNPJ = (cnpj: string) => {
+    return cnpj
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1/$2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+      .substring(0, 18);
+  };
+
+  const formatCEP = (cep: string) => {
+    return cep
+      .replace(/\D/g, '')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .substring(0, 9);
+  };
+
+  const formatPhone = (phone: string) => {
+    return phone
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d)/, '$1-$2')
+      .substring(0, 15);
+  };
+
+  const validateCNPJ = (cnpj: string) => {
+    const cleaned = cnpj.replace(/\D/g, '');
+    return cleaned.length === 14;
+  };
+
+  const validateCEP = (cep: string) => {
+    const cleaned = cep.replace(/\D/g, '');
+    return cleaned.length === 8;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.senha || formData.senha.length < 6) {
+    if (!editingCliente) {
+      if (!formData.senha || formData.senha.length < 6) {
+        toast({
+          title: "Erro",
+          description: "A senha deve ter pelo menos 6 caracteres",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (formData.senha !== formData.confirmarSenha) {
+        toast({
+          title: "Erro",
+          description: "As senhas não coincidem",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (formData.cnpj && !validateCNPJ(formData.cnpj)) {
       toast({
         title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres",
+        description: "CNPJ inválido",
         variant: "destructive",
       });
       return;
     }
 
-    if (formData.senha !== formData.confirmarSenha) {
+    if (formData.cep && !validateCEP(formData.cep)) {
       toast({
         title: "Erro",
-        description: "As senhas não coincidem",
+        description: "CEP inválido",
         variant: "destructive",
       });
       return;
@@ -168,8 +253,14 @@ export default function Clientes() {
           .from('profiles')
           .update({
             nome: formData.nome,
-            telefone: formData.telefone,
-            empresa: formData.empresa,
+            telefone: formData.telefone || null,
+            empresa: formData.empresa || null,
+            cnpj: formData.cnpj ? formData.cnpj.replace(/\D/g, '') : null,
+            endereco: formData.endereco || null,
+            cep: formData.cep ? formData.cep.replace(/\D/g, '') : null,
+            cidade: formData.cidade || null,
+            estado: formData.estado || null,
+            complemento: formData.complemento || null,
             ativo: formData.ativo
           })
           .eq('id', editingCliente.id);
@@ -207,14 +298,20 @@ export default function Clientes() {
 
         if (authData.user) {
           // Aguardar um pouco para o trigger criar o perfil
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
 
           // Atualizar o perfil criado pelo trigger
           const { error: profileError } = await supabase
             .from('profiles')
             .update({
-              telefone: formData.telefone,
-              empresa: formData.empresa,
+              telefone: formData.telefone || null,
+              empresa: formData.empresa || null,
+              cnpj: formData.cnpj ? formData.cnpj.replace(/\D/g, '') : null,
+              endereco: formData.endereco || null,
+              cep: formData.cep ? formData.cep.replace(/\D/g, '') : null,
+              cidade: formData.cidade || null,
+              estado: formData.estado || null,
+              complemento: formData.complemento || null,
               ativo: formData.ativo
             })
             .eq('user_id', authData.user.id);
@@ -233,7 +330,7 @@ export default function Clientes() {
 
           if (roleError) {
             console.error('Role error:', roleError);
-            // Não vamos falhar aqui, mas vamos tentar novamente
+            // Tentar novamente após um delay
             setTimeout(async () => {
               await supabase
                 .from('user_roles')
@@ -252,7 +349,7 @@ export default function Clientes() {
       }
 
       resetForm();
-      fetchClientes();
+      await fetchClientes();
     } catch (error: any) {
       console.error('Error saving client:', error);
       toast({
@@ -271,6 +368,12 @@ export default function Clientes() {
       email: "",
       telefone: "",
       empresa: "",
+      cnpj: "",
+      endereco: "",
+      cep: "",
+      cidade: "",
+      estado: "",
+      complemento: "",
       senha: "",
       confirmarSenha: "",
       ativo: true
@@ -286,6 +389,12 @@ export default function Clientes() {
       email: cliente.email,
       telefone: cliente.telefone || "",
       empresa: cliente.empresa || "",
+      cnpj: cliente.cnpj ? formatCNPJ(cliente.cnpj) : "",
+      endereco: cliente.endereco || "",
+      cep: cliente.cep ? formatCEP(cliente.cep) : "",
+      cidade: cliente.cidade || "",
+      estado: cliente.estado || "",
+      complemento: cliente.complemento || "",
       senha: "",
       confirmarSenha: "",
       ativo: cliente.ativo
@@ -294,12 +403,11 @@ export default function Clientes() {
   };
 
   const handleDelete = async (cliente: Cliente) => {
-    if (!confirm(`Tem certeza que deseja excluir o cliente ${cliente.nome}?`)) {
+    if (!confirm(`Tem certeza que deseja desativar o cliente ${cliente.nome}?`)) {
       return;
     }
 
     try {
-      // Desativar o cliente ao invés de deletar
       const { error } = await supabase
         .from('profiles')
         .update({ ativo: false })
@@ -312,7 +420,7 @@ export default function Clientes() {
         description: "O cliente foi desativado do sistema.",
       });
 
-      fetchClientes();
+      await fetchClientes();
     } catch (error) {
       console.error('Error deactivating client:', error);
       toast({
@@ -325,8 +433,8 @@ export default function Clientes() {
 
   const getStatusBadge = (ativo: boolean) => {
     return ativo 
-      ? <Badge variant="default" className="bg-green-100 text-green-800">Ativo</Badge>
-      : <Badge variant="secondary" className="bg-gray-100 text-gray-800">Inativo</Badge>;
+      ? <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Ativo</Badge>
+      : <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200">Inativo</Badge>;
   };
 
   const totalAtivos = clientes.filter(c => c.ativo).length;
@@ -378,7 +486,7 @@ export default function Clientes() {
                 Novo Cliente
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingCliente ? 'Editar Cliente' : 'Cadastrar Novo Cliente'}
@@ -386,101 +494,189 @@ export default function Clientes() {
                 <DialogDescription>
                   {editingCliente 
                     ? 'Atualize as informações do cliente'
-                    : 'Preencha os dados para cadastrar um novo cliente com acesso ao sistema'
+                    : 'Preencha os dados completos para cadastrar um novo cliente com acesso ao sistema'
                   }
                 </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome Completo *</Label>
-                    <Input
-                      id="nome"
-                      value={formData.nome}
-                      onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                      required
-                    />
-                  </div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Dados Básicos */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Dados Básicos</h3>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      required
-                      disabled={!!editingCliente}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone</Label>
-                    <Input
-                      id="telefone"
-                      value={formData.telefone}
-                      onChange={(e) => setFormData({...formData, telefone: e.target.value})}
-                      placeholder="(11) 99999-9999"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="empresa">Empresa</Label>
-                    <Input
-                      id="empresa"
-                      value={formData.empresa}
-                      onChange={(e) => setFormData({...formData, empresa: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                {!editingCliente && (
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="senha">Senha Temporária *</Label>
+                      <Label htmlFor="nome">Nome Completo / Razão Social *</Label>
                       <Input
-                        id="senha"
-                        type="password"
-                        value={formData.senha}
-                        onChange={(e) => setFormData({...formData, senha: e.target.value})}
-                        placeholder="Mínimo 6 caracteres"
+                        id="nome"
+                        value={formData.nome}
+                        onChange={(e) => setFormData({...formData, nome: e.target.value})}
                         required
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="confirmarSenha">Confirmar Senha *</Label>
+                      <Label htmlFor="email">Email *</Label>
                       <Input
-                        id="confirmarSenha"
-                        type="password"
-                        value={formData.confirmarSenha}
-                        onChange={(e) => setFormData({...formData, confirmarSenha: e.target.value})}
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
                         required
+                        disabled={!!editingCliente}
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="telefone">Telefone</Label>
+                      <Input
+                        id="telefone"
+                        value={formData.telefone}
+                        onChange={(e) => setFormData({...formData, telefone: formatPhone(e.target.value)})}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="empresa">Nome Fantasia</Label>
+                      <Input
+                        id="empresa"
+                        value={formData.empresa}
+                        onChange={(e) => setFormData({...formData, empresa: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cnpj">CNPJ</Label>
+                    <Input
+                      id="cnpj"
+                      value={formData.cnpj}
+                      onChange={(e) => setFormData({...formData, cnpj: formatCNPJ(e.target.value)})}
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Endereço</h3>
+                  
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="cep">CEP</Label>
+                      <Input
+                        id="cep"
+                        value={formData.cep}
+                        onChange={(e) => setFormData({...formData, cep: formatCEP(e.target.value)})}
+                        placeholder="00000-000"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="cidade">Cidade</Label>
+                      <Input
+                        id="cidade"
+                        value={formData.cidade}
+                        onChange={(e) => setFormData({...formData, cidade: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="estado">Estado</Label>
+                      <Select 
+                        value={formData.estado} 
+                        onValueChange={(value) => setFormData({...formData, estado: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {estadosBrasil.map(estado => (
+                            <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco">Logradouro</Label>
+                    <Input
+                      id="endereco"
+                      value={formData.endereco}
+                      onChange={(e) => setFormData({...formData, endereco: e.target.value})}
+                      placeholder="Rua, Avenida, etc."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="complemento">Complemento</Label>
+                    <Input
+                      id="complemento"
+                      value={formData.complemento}
+                      onChange={(e) => setFormData({...formData, complemento: e.target.value})}
+                      placeholder="Apartamento, sala, andar, etc."
+                    />
+                  </div>
+                </div>
+
+                {/* Acesso ao Sistema */}
+                {!editingCliente && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium border-b pb-2">Acesso ao Sistema</h3>
+                    
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="senha">Senha Temporária *</Label>
+                        <Input
+                          id="senha"
+                          type="password"
+                          value={formData.senha}
+                          onChange={(e) => setFormData({...formData, senha: e.target.value})}
+                          placeholder="Mínimo 6 caracteres"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmarSenha">Confirmar Senha *</Label>
+                        <Input
+                          id="confirmarSenha"
+                          type="password"
+                          value={formData.confirmarSenha}
+                          onChange={(e) => setFormData({...formData, confirmarSenha: e.target.value})}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="ativo">Status</Label>
-                  <Select 
-                    value={formData.ativo ? "true" : "false"} 
-                    onValueChange={(value) => setFormData({...formData, ativo: value === "true"})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Ativo</SelectItem>
-                      <SelectItem value="false">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                {/* Status */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Status</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="ativo">Status do Cliente</Label>
+                    <Select 
+                      value={formData.ativo ? "true" : "false"} 
+                      onValueChange={(value) => setFormData({...formData, ativo: value === "true"})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Ativo</SelectItem>
+                        <SelectItem value="false">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="flex justify-end space-x-2">
+                <div className="flex justify-end space-x-2 pt-4 border-t">
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancelar
                   </Button>
@@ -542,7 +738,7 @@ export default function Clientes() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, email ou empresa..."
+                  placeholder="Buscar por nome, email, empresa, CNPJ ou cidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -579,9 +775,10 @@ export default function Clientes() {
                   <TableRow>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Contato</TableHead>
-                    <TableHead>Empresa</TableHead>
+                    <TableHead>Empresa/CNPJ</TableHead>
+                    <TableHead>Localização</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Cadastrado em</TableHead>
+                    <TableHead>Cadastrado</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -595,6 +792,9 @@ export default function Clientes() {
                           </div>
                           <div>
                             <div className="font-medium">{cliente.nome}</div>
+                            {cliente.empresa && cliente.empresa !== cliente.nome && (
+                              <div className="text-sm text-muted-foreground">{cliente.empresa}</div>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -607,12 +807,34 @@ export default function Clientes() {
                           {cliente.telefone && (
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
                               <Phone className="h-3 w-3" />
-                              {cliente.telefone}
+                              {formatPhone(cliente.telefone)}
                             </div>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{cliente.empresa || '-'}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {cliente.empresa && (
+                            <div className="text-sm font-medium">{cliente.empresa}</div>
+                          )}
+                          {cliente.cnpj && (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <FileText className="h-3 w-3" />
+                              {formatCNPJ(cliente.cnpj)}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {cliente.cidade && cliente.estado ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3 w-3" />
+                            {cliente.cidade}, {cliente.estado}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(cliente.ativo)}</TableCell>
                       <TableCell className="text-sm">
                         {new Date(cliente.created_at).toLocaleDateString('pt-BR')}

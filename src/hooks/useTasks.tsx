@@ -63,16 +63,10 @@ export function useTasks() {
   };
 
   const createTask = async (taskData: Partial<Task>) => {
-    console.log('=== DEBUG CREATE TASK ===');
-    console.log('User:', user);
-    console.log('User ID:', user?.id);
-    console.log('Is Admin:', isAdmin);
-    console.log('Session from supabase:', await supabase.auth.getSession());
-    
     if (!user?.id) {
       toast({
         title: "Erro",
-        description: "Usuário não autenticado",
+        description: "Usuário não autenticado. Faça login novamente.",
         variant: "destructive",
       });
       return;
