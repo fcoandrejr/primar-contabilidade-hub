@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,134 +31,238 @@ import {
   Edit,
   Trash2,
   Eye,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
   Building2,
   Mail,
   Phone,
-  MapPin,
+  User,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Cliente {
   id: string;
   nome: string;
   email: string;
-  cnpj: string;
-  telefone: string;
-  endereco: string;
-  status: 'ativo' | 'inativo';
-  pagamento: 'em_dia' | 'atrasado';
-  ultimaInteracao: string;
-  valorMensal: number;
+  telefone?: string;
+  empresa?: string;
+  ativo: boolean;
+  created_at: string;
+  user_id: string;
 }
 
-const clientesData: Cliente[] = [
-  {
-    id: "1",
-    nome: "Empresa ABC Ltda",
-    email: "contato@abc.com.br",
-    cnpj: "12.345.678/0001-90",
-    telefone: "(11) 9876-5432",
-    endereco: "Rua das Flores, 123 - São Paulo/SP",
-    status: "ativo",
-    pagamento: "em_dia",
-    ultimaInteracao: "2025-01-15",
-    valorMensal: 1500
-  },
-  {
-    id: "2",
-    nome: "Comércio XYZ S/A",
-    email: "admin@xyz.com.br",
-    cnpj: "98.765.432/0001-10",
-    telefone: "(11) 1234-5678",
-    endereco: "Av. Principal, 456 - São Paulo/SP",
-    status: "ativo",
-    pagamento: "atrasado",
-    ultimaInteracao: "2025-01-10",
-    valorMensal: 2200
-  },
-  {
-    id: "3",
-    nome: "Serviços DEF ME",
-    email: "financeiro@def.com.br",
-    cnpj: "11.222.333/0001-44",
-    telefone: "(11) 5555-9999",
-    endereco: "Rua Comercial, 789 - São Paulo/SP",
-    status: "inativo",
-    pagamento: "em_dia",
-    ultimaInteracao: "2024-12-20",
-    valorMensal: 800
-  },
-];
-
 export default function Clientes() {
-  const { userRole } = useAuth();
+  const { userRole, isAdmin, isFuncionario } = useAuth();
   const { toast } = useToast();
   
-  const userType = userRole || 'cliente';
-
-  const [clientes, setClientes] = useState<Cliente[]>(clientesData);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("todos");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
-    cnpj: "",
     telefone: "",
-    endereco: "",
-    status: "ativo" as "ativo" | "inativo",
-    valorMensal: 0
+    empresa: "",
+    senha: "",
+    confirmarSenha: "",
+    ativo: true
   });
+
+  useEffect(() => {
+    if (isAdmin || isFuncionario) {
+      fetchClientes();
+    }
+  }, [isAdmin, isFuncionario]);
+
+  const fetchClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          nome,
+          email,
+          telefone,
+          empresa,
+          ativo,
+          created_at,
+          user_id
+        `)
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Filtrar apenas usuários com role 'cliente'
+      if (data) {
+        const { data: clientRoles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'cliente');
+
+        if (rolesError) throw rolesError;
+
+        const clientUserIds = clientRoles?.map(role => role.user_id) || [];
+        const clientProfiles = data.filter(profile => 
+          clientUserIds.includes(profile.user_id)
+        );
+
+        setClientes(clientProfiles);
+      }
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao carregar clientes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredClientes = clientes.filter(cliente => {
     const matchesSearch = cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cliente.cnpj.includes(searchTerm) ||
-                         cliente.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         cliente.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (cliente.empresa && cliente.empresa.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesFilter = filterStatus === "todos" || cliente.status === filterStatus;
+    const matchesFilter = filterStatus === "todos" || 
+                         (filterStatus === "ativo" && cliente.ativo) ||
+                         (filterStatus === "inativo" && !cliente.ativo);
     
     return matchesSearch && matchesFilter;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingCliente) {
-      setClientes(clientes.map(cliente => 
-        cliente.id === editingCliente.id 
-          ? { ...cliente, ...formData, pagamento: 'em_dia', ultimaInteracao: new Date().toISOString().split('T')[0] }
-          : cliente
-      ));
-      toast({ title: "Cliente atualizado com sucesso!" });
-    } else {
-      const novoCliente: Cliente = {
-        id: (clientes.length + 1).toString(),
-        ...formData,
-        pagamento: 'em_dia',
-        ultimaInteracao: new Date().toISOString().split('T')[0]
-      };
-      setClientes([...clientes, novoCliente]);
-      toast({ title: "Cliente cadastrado com sucesso!" });
+    if (!formData.senha || formData.senha.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
     }
 
-    resetForm();
+    if (formData.senha !== formData.confirmarSenha) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      if (editingCliente) {
+        // Atualizar cliente existente
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            nome: formData.nome,
+            telefone: formData.telefone,
+            empresa: formData.empresa,
+            ativo: formData.ativo
+          })
+          .eq('id', editingCliente.id);
+
+        if (error) throw error;
+
+        toast({ 
+          title: "Sucesso",
+          description: "Cliente atualizado com sucesso!" 
+        });
+      } else {
+        // Criar novo usuário no auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.senha,
+          options: {
+            data: {
+              nome: formData.nome,
+              empresa: formData.empresa
+            }
+          }
+        });
+
+        if (authError) {
+          if (authError.message.includes('User already registered')) {
+            toast({
+              title: "Erro",
+              description: "Este email já está cadastrado no sistema",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw authError;
+        }
+
+        if (authData.user) {
+          // Aguardar um pouco para o trigger criar o perfil
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Atualizar o perfil criado pelo trigger
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              telefone: formData.telefone,
+              empresa: formData.empresa,
+              ativo: formData.ativo
+            })
+            .eq('user_id', authData.user.id);
+
+          if (profileError) {
+            console.error('Error updating profile:', profileError);
+          }
+
+          // Atribuir role de cliente
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: authData.user.id,
+              role: 'cliente'
+            });
+
+          if (roleError) throw roleError;
+
+          toast({ 
+            title: "Sucesso",
+            description: "Cliente cadastrado com sucesso! Senha temporária criada." 
+          });
+        }
+      }
+
+      resetForm();
+      fetchClientes();
+    } catch (error: any) {
+      console.error('Error saving client:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao salvar cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       nome: "",
       email: "",
-      cnpj: "",
       telefone: "",
-      endereco: "",
-      status: "ativo",
-      valorMensal: 0
+      empresa: "",
+      senha: "",
+      confirmarSenha: "",
+      ativo: true
     });
     setEditingCliente(null);
     setIsDialogOpen(false);
@@ -169,39 +273,80 @@ export default function Clientes() {
     setFormData({
       nome: cliente.nome,
       email: cliente.email,
-      cnpj: cliente.cnpj,
-      telefone: cliente.telefone,
-      endereco: cliente.endereco,
-      status: cliente.status,
-      valorMensal: cliente.valorMensal
+      telefone: cliente.telefone || "",
+      empresa: cliente.empresa || "",
+      senha: "",
+      confirmarSenha: "",
+      ativo: cliente.ativo
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setClientes(clientes.filter(cliente => cliente.id !== id));
-    toast({ 
-      title: "Cliente removido",
-      description: "O cliente foi removido do sistema.",
-      variant: "destructive"
-    });
+  const handleDelete = async (cliente: Cliente) => {
+    if (!confirm(`Tem certeza que deseja excluir o cliente ${cliente.nome}?`)) {
+      return;
+    }
+
+    try {
+      // Desativar o cliente ao invés de deletar
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ativo: false })
+        .eq('id', cliente.id);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Cliente desativado",
+        description: "O cliente foi desativado do sistema.",
+      });
+
+      fetchClientes();
+    } catch (error) {
+      console.error('Error deactivating client:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao desativar cliente",
+        variant: "destructive",
+      });
+    }
   };
 
-  const getStatusBadge = (status: string) => {
-    return status === 'ativo' 
+  const getStatusBadge = (ativo: boolean) => {
+    return ativo 
       ? <Badge variant="default" className="bg-green-100 text-green-800">Ativo</Badge>
       : <Badge variant="secondary" className="bg-gray-100 text-gray-800">Inativo</Badge>;
   };
 
-  const getPagamentoBadge = (pagamento: string) => {
-    return pagamento === 'em_dia'
-      ? <Badge variant="default" className="bg-blue-100 text-blue-800">Em Dia</Badge>
-      : <Badge variant="destructive">Atrasado</Badge>;
-  };
+  const totalAtivos = clientes.filter(c => c.ativo).length;
+  const totalInativos = clientes.filter(c => !c.ativo).length;
 
-  const totalAtivos = clientes.filter(c => c.status === 'ativo').length;
-  const totalAtrasados = clientes.filter(c => c.pagamento === 'atrasado').length;
-  const receitaTotal = clientes.filter(c => c.status === 'ativo').reduce((acc, c) => acc + c.valorMensal, 0);
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando clientes...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!isAdmin && !isFuncionario) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <Building2 className="mx-auto h-12 w-12 text-muted-foreground/50" />
+          <h3 className="mt-4 text-lg font-medium">Acesso Restrito</h3>
+          <p className="text-muted-foreground">
+            Apenas administradores e funcionários podem gerenciar clientes.
+          </p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -211,7 +356,7 @@ export default function Clientes() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Gestão de Clientes</h1>
             <p className="text-muted-foreground">
-              Gerencie todos os clientes do escritório contábil
+              Cadastre e gerencie todos os clientes do escritório contábil
             </p>
           </div>
           
@@ -225,12 +370,12 @@ export default function Clientes() {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>
-                  {editingCliente ? 'Editar Cliente' : 'Novo Cliente'}
+                  {editingCliente ? 'Editar Cliente' : 'Cadastrar Novo Cliente'}
                 </DialogTitle>
                 <DialogDescription>
                   {editingCliente 
                     ? 'Atualize as informações do cliente'
-                    : 'Preencha os dados para cadastrar um novo cliente'
+                    : 'Preencha os dados para cadastrar um novo cliente com acesso ao sistema'
                   }
                 </DialogDescription>
               </DialogHeader>
@@ -238,7 +383,7 @@ export default function Clientes() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="nome">Nome/Razão Social *</Label>
+                    <Label htmlFor="nome">Nome Completo *</Label>
                     <Input
                       id="nome"
                       value={formData.nome}
@@ -248,19 +393,6 @@ export default function Clientes() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="cnpj">CNPJ *</Label>
-                    <Input
-                      id="cnpj"
-                      value={formData.cnpj}
-                      onChange={(e) => setFormData({...formData, cnpj: e.target.value})}
-                      placeholder="00.000.000/0000-00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
                     <Label htmlFor="email">Email *</Label>
                     <Input
                       id="email"
@@ -268,64 +400,81 @@ export default function Clientes() {
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
                       required
+                      disabled={!!editingCliente}
                     />
                   </div>
-                  
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone *</Label>
+                    <Label htmlFor="telefone">Telefone</Label>
                     <Input
                       id="telefone"
                       value={formData.telefone}
                       onChange={(e) => setFormData({...formData, telefone: e.target.value})}
                       placeholder="(11) 99999-9999"
-                      required
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="endereco">Endereço</Label>
-                  <Textarea
-                    id="endereco"
-                    value={formData.endereco}
-                    onChange={(e) => setFormData({...formData, endereco: e.target.value})}
-                    rows={2}
-                  />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status} onValueChange={(value: "ativo" | "inativo") => setFormData({...formData, status: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ativo">Ativo</SelectItem>
-                        <SelectItem value="inativo">Inativo</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="valorMensal">Valor Mensal (R$)</Label>
+                    <Label htmlFor="empresa">Empresa</Label>
                     <Input
-                      id="valorMensal"
-                      type="number"
-                      value={formData.valorMensal}
-                      onChange={(e) => setFormData({...formData, valorMensal: parseFloat(e.target.value) || 0})}
-                      min="0"
-                      step="0.01"
+                      id="empresa"
+                      value={formData.empresa}
+                      onChange={(e) => setFormData({...formData, empresa: e.target.value})}
                     />
                   </div>
+                </div>
+
+                {!editingCliente && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="senha">Senha Temporária *</Label>
+                      <Input
+                        id="senha"
+                        type="password"
+                        value={formData.senha}
+                        onChange={(e) => setFormData({...formData, senha: e.target.value})}
+                        placeholder="Mínimo 6 caracteres"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmarSenha">Confirmar Senha *</Label>
+                      <Input
+                        id="confirmarSenha"
+                        type="password"
+                        value={formData.confirmarSenha}
+                        onChange={(e) => setFormData({...formData, confirmarSenha: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="ativo">Status</Label>
+                  <Select 
+                    value={formData.ativo ? "true" : "false"} 
+                    onValueChange={(value) => setFormData({...formData, ativo: value === "true"})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Ativo</SelectItem>
+                      <SelectItem value="false">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex justify-end space-x-2">
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancelar
                   </Button>
-                  <Button type="submit" className="gradient-primary">
-                    {editingCliente ? 'Atualizar' : 'Cadastrar'}
+                  <Button type="submit" className="gradient-primary" disabled={submitting}>
+                    {submitting ? "Salvando..." : editingCliente ? 'Atualizar' : 'Cadastrar'}
                   </Button>
                 </div>
               </form>
@@ -334,7 +483,7 @@ export default function Clientes() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
@@ -343,7 +492,7 @@ export default function Clientes() {
             <CardContent>
               <div className="text-2xl font-bold">{clientes.length}</div>
               <p className="text-xs text-muted-foreground">
-                {totalAtivos} ativos
+                Cadastrados no sistema
               </p>
             </CardContent>
           </Card>
@@ -351,45 +500,28 @@ export default function Clientes() {
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <User className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{totalAtivos}</div>
               <p className="text-xs text-muted-foreground">
-                {((totalAtivos / clientes.length) * 100).toFixed(1)}% do total
+                {clientes.length > 0 ? ((totalAtivos / clientes.length) * 100).toFixed(1) : 0}% do total
               </p>
             </CardContent>
           </Card>
 
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pagamentos Atrasados</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium">Clientes Inativos</CardTitle>
+              <User className="h-4 w-4 text-gray-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{totalAtrasados}</div>
+              <div className="text-2xl font-bold text-gray-600">{totalInativos}</div>
               <p className="text-xs text-muted-foreground">
-                Requer atenção
+                Desativados
               </p>
             </CardContent>
           </Card>
-
-          {userType === 'admin' && (
-            <Card className="glass-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-                <FileText className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  R$ {receitaTotal.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Valor total dos contratos
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Filters */}
@@ -399,7 +531,7 @@ export default function Clientes() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, CNPJ ou email..."
+                  placeholder="Buscar por nome, email ou empresa..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -436,11 +568,9 @@ export default function Clientes() {
                   <TableRow>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Contato</TableHead>
-                    <TableHead>CNPJ</TableHead>
+                    <TableHead>Empresa</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Pagamento</TableHead>
-                    {userType === 'admin' && <TableHead>Valor</TableHead>}
-                    <TableHead>Última Interação</TableHead>
+                    <TableHead>Cadastrado em</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -450,14 +580,10 @@ export default function Clientes() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-primary" />
+                            <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
                             <div className="font-medium">{cliente.nome}</div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {cliente.endereco.split(' - ')[1] || 'Não informado'}
-                            </div>
                           </div>
                         </div>
                       </TableCell>
@@ -467,22 +593,18 @@ export default function Clientes() {
                             <Mail className="h-3 w-3" />
                             {cliente.email}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            {cliente.telefone}
-                          </div>
+                          {cliente.telefone && (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Phone className="h-3 w-3" />
+                              {cliente.telefone}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{cliente.cnpj}</TableCell>
-                      <TableCell>{getStatusBadge(cliente.status)}</TableCell>
-                      <TableCell>{getPagamentoBadge(cliente.pagamento)}</TableCell>
-                      {userType === 'admin' && (
-                        <TableCell className="font-semibold text-green-600">
-                          R$ {cliente.valorMensal.toLocaleString()}
-                        </TableCell>
-                      )}
+                      <TableCell>{cliente.empresa || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(cliente.ativo)}</TableCell>
                       <TableCell className="text-sm">
-                        {new Date(cliente.ultimaInteracao).toLocaleDateString('pt-BR')}
+                        {new Date(cliente.created_at).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -492,25 +614,17 @@ export default function Clientes() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {/* Ver detalhes */}}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver Detalhes
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEdit(cliente)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {/* Ver documentos */}}>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Documentos
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
-                              onClick={() => handleDelete(cliente.id)}
+                              onClick={() => handleDelete(cliente)}
                               className="text-destructive"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Excluir
+                              Desativar
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
