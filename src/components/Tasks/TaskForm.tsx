@@ -163,6 +163,8 @@ export function TaskForm({ task, open, onOpenChange, onSubmit }: TaskFormProps) 
 
   const canBlockTasks = isAdmin || isFuncionario;
 
+  console.log('TaskForm render - open:', open, 'task:', task);
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

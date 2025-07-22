@@ -93,8 +93,10 @@ export default function Tarefas() {
           </div>
           <Button 
             onClick={() => {
+              console.log('Opening task form...');
               setEditingTask(null);
               setShowTaskForm(true);
+              console.log('showTaskForm set to:', true);
             }}
             className="flex items-center gap-2"
           >
