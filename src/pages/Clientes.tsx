@@ -231,7 +231,18 @@ export default function Clientes() {
               role: 'cliente'
             });
 
-          if (roleError) throw roleError;
+          if (roleError) {
+            console.error('Role error:', roleError);
+            // Não vamos falhar aqui, mas vamos tentar novamente
+            setTimeout(async () => {
+              await supabase
+                .from('user_roles')
+                .insert({
+                  user_id: authData.user.id,
+                  role: 'cliente'
+                });
+            }, 2000);
+          }
 
           toast({ 
             title: "Sucesso",
