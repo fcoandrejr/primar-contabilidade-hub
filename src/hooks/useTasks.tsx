@@ -63,10 +63,6 @@ export function useTasks() {
   };
 
   const createTask = async (taskData: Partial<Task>) => {
-    console.log('User in createTask:', user);
-    console.log('Is Admin:', isAdmin);
-    console.log('Task data:', taskData);
-    
     if (!user?.id) {
       toast({
         title: "Erro",
